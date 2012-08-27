@@ -29,7 +29,6 @@ function Application (opts) {
       req.route = self.routes.match(req.u.pathname)
       cached = req.route.fn.request(req, resp)
       self.lru.set(req.u.pathname, cached)
-      cached.emit('request', req, resp)
     }
   })
   
@@ -45,10 +44,8 @@ Application.prototype.route = function (pattern, cb) {
   this.routes.define(pattern, r) 
   return r
 }
-Application.prototype.add = function (url, stream) {
-  self.lru.set(url, stream)
-}
 Application.prototype.flush = function (pattern) {
+  var self = this
   if (!pattern) self.lru.reset()
   Object.keys(self.lru.cache).forEach(function (key) {
     // find matches and remove them
@@ -58,6 +55,28 @@ Application.prototype.flush = function (pattern) {
 function Route (app, pattern, cb) {
   this.app = app
   this.pattern = pattern
+  if (cb) {
+    this.request = function (req, resp) {
+      var cached = new Cached()
+      
+      resp._write = resp.write
+      resp.write = function write (chunk) {
+        if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
+        cached.write(chunk)
+        resp._write(chunk)
+      }
+      
+      resp._end = resp.end
+      resp.end = function end (chunk) {
+        if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
+        cached.end(chunk)
+        resp._end(chunk)
+      }
+      
+      cb(req, resp)
+      return cached
+    }
+  }
 }
 util.inherits(Route, events.EventEmitter)
 Route.prototype.files = function (filepath) {
@@ -80,7 +99,7 @@ Route.prototype.files = function (filepath) {
       cached.writeHead(200, {'content-type': mime.lookup(p)})
       cached.end(data)
     })
-    
+    cached.emit('request', req, resp)
     return cached
   }
 }
@@ -89,7 +108,6 @@ Route.prototype.file = function (path, watchFile) {
   
   fs.readFile(path, function (e, data) {
     if (e) {
-      console.error(e)
       cached.writeHead(404, {'content-type': 'text/plain'})
       cached.end('Not Found')
       return
@@ -98,6 +116,7 @@ Route.prototype.file = function (path, watchFile) {
     cached.end(data)
   })
   this.request = function (req, resp) {
+    cached.emit('request', req, resp)
     return cached
   }
 }
@@ -109,8 +128,24 @@ function Cached () {
   self.ended = false
   self.headers = {}
   self.urls = {}
+  self.methods = ['GET', 'HEAD']
   self.on('request', function (req, resp) {
     self.urls[req.u.pathname] = true
+    
+    if (req.method === 'HEAD' && self.md5) {
+      resp.writeHead(self.statusCode, self.headers)
+      resp.end()
+      return
+    }
+    if (req.headers['if-none-match'] && req.headers['if-none-match'] === self.md5) {
+      var h = {}
+      for (i in self.headers) {
+        if (i !== 'content-length') h[i] = self.headers[i]
+      }
+      resp.writeHead(304, h)
+      resp.end()
+      return
+    }
     
     if (self.ended) {
       resp.writeHead(self.statusCode, self.headers)
@@ -137,15 +172,29 @@ function Cached () {
 }
 util.inherits(Cached, events.EventEmitter)
 Cached.prototype.write = function (data) {
+  if (!this._headerSent) {
+    if (!this.statusCode) throw new Error('Must set statusCode before write()')
+    this.emit('writeHead')
+  }
   if (!Buffer.isBuffer(data)) data = new Buffer(data)
   this.length += data.length
   this.data.push(data)
   this.emit('data', data)
 }
 Cached.prototype.writeHead = function (status, headers) {
+  this._headerSent = true
   this.statusCode = status
   for (var i in headers) this.headers[i] = headers[i]
   this.emit('writeHead')
+}
+Cached.prototype.setHeader = function (key, value) {
+  this.headers[key] = value
+}
+Cached.prototype.getHeader = function (key) {
+  return this.headers[key]
+}
+Cached.prototype.removeHeader = function (key) {
+  delete this.headers[key]
 }
 Cached.prototype.end = function (data) {
   if (data) this.write(data)

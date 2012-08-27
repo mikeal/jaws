@@ -5,10 +5,14 @@
   "version": "0.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "node test/test-*"
+    "test": "node test/run.js"
   },
-  "dependencies": {},
-  "devDependencies": {},
+  "dependencies": {
+    "lru-cache": "~2.0.1", 
+    "mapleTree": "~0.2.1", 
+    "mime": "~1.2.7" 
+  },
+  "devDependencies": {"request":"~2.10.0"},
   "optionalDependencies": {},
   "engines": {
     "node": "*"
