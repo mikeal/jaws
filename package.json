@@ -1,0 +1,16 @@
+{
+  "author": "Mikeal Rogers <mikeal.rogers@gmail.com>",
+  "name": "jaws",
+  "description": "Build HTTP applications as a cache.",
+  "version": "0.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test-*"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
