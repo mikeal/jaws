@@ -6,6 +6,7 @@ var fs = require('fs')
   , url = require('url')
   , events = require('events')
   , crypto = require('crypto')
+  , zlib = require('zlib')
   
   , mime = require('mime')
   , mapleTree = require('mapleTree')
@@ -20,15 +21,27 @@ function Application (opts) {
   self.routes = new mapleTree.RouteTree()
   
   self.on('request', function (req, resp) {
-    req.u = url.parse(req.url)
+    resp.notfound = function (data) {
+      resp.setHeader('content-type', 'text/plain')
+      resp.statusCode = 404
+      resp.end(data || 'Not Found')
+    }
+    
+    resp.html = function (data) {
+      resp.setHeader('content-type', 'text/html')
+      resp.statusCode = 200
+      resp.end(data)
+    }
+    
     if (req.method === 'GET' || req.method === 'HEAD') {
-      var cached = self.lru.get(req.u.pathname)
+      var cached = self.lru.get(req.url)
       if (cached) return cached.emit('request', req, resp)
       
       // not in cache
-      req.route = self.routes.match(req.u.pathname)
-      cached = req.route.fn.request(req, resp)
-      self.lru.set(req.u.pathname, cached)
+      req.route = self.routes.match(req.url)
+      if (!req.route) return resp.notfound()
+      cached = req.route.fn().request(req, resp)
+      self.lru.set(req.url, cached)
     }
   })
   
@@ -41,7 +54,7 @@ function Application (opts) {
 util.inherits(Application, events.EventEmitter)
 Application.prototype.route = function (pattern, cb) {
   var r = new Route(this, pattern, cb)
-  this.routes.define(pattern, r) 
+  this.routes.define(pattern, function () {return r})
   return r
 }
 Application.prototype.flush = function (pattern) {
@@ -130,7 +143,7 @@ function Cached () {
   self.urls = {}
   self.methods = ['GET', 'HEAD']
   self.on('request', function (req, resp) {
-    self.urls[req.u.pathname] = true
+    self.urls[req.url] = true
     
     if (req.method === 'HEAD' && self.md5) {
       resp.writeHead(self.statusCode, self.headers)
@@ -139,11 +152,22 @@ function Cached () {
     }
     if (req.headers['if-none-match'] && req.headers['if-none-match'] === self.md5) {
       var h = {}
-      for (i in self.headers) {
+      for (var i in self.headers) {
         if (i !== 'content-length') h[i] = self.headers[i]
       }
       resp.writeHead(304, h)
       resp.end()
+      return
+    }
+    
+    // gzipping
+    if (self.ended && req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/) ) {
+      for (var i in self.headers) {
+        resp.setHeader(i, self.headers[i])
+      }
+      resp.setHeader('content-encoding', 'gzip')
+      resp.setHeader('content-length', self.compressed.length)
+      resp.end(self.compressed)
       return
     }
     
@@ -169,6 +193,22 @@ function Cached () {
       })
     }
   })
+  self.compressor = new zlib.createGzip()
+  self.compressedData = []
+  self.compressedLength = 0
+  self.compressor.on('data', function (chunk) {
+    self.compressedData.push(chunk)
+    self.compressedLength += chunk.length
+  })
+  self.compressor.on('end', function () {
+    var i = 0
+    var buffer = new Buffer(self.compressedLength)
+    self.compressedData.forEach(function (chunk) {
+      chunk.copy(buffer, i, 0, chunk.length)
+      i += chunk.length
+    })
+    self.compressed = buffer
+  })
 }
 util.inherits(Cached, events.EventEmitter)
 Cached.prototype.write = function (data) {
@@ -179,6 +219,7 @@ Cached.prototype.write = function (data) {
   if (!Buffer.isBuffer(data)) data = new Buffer(data)
   this.length += data.length
   this.data.push(data)
+  this.compressor.write(data)
   this.emit('data', data)
 }
 Cached.prototype.writeHead = function (status, headers) {
@@ -199,6 +240,9 @@ Cached.prototype.removeHeader = function (key) {
 Cached.prototype.end = function (data) {
   if (data) this.write(data)
   this.ended = true
+  
+  this.compressor.end()
+  
   var i = 0
   var buffer = new Buffer(this.length)
   this.data.forEach(function (chunk) {
