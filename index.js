@@ -19,6 +19,7 @@ function Application (opts) {
   
   self.lru = lrucache(opts)
   self.routes = new mapleTree.RouteTree()
+  self.conditions = {}
   
   self.on('request', function (req, resp) {
     resp.notfound = function (data) {
@@ -33,16 +34,41 @@ function Application (opts) {
       resp.end(data)
     }
     
-    if (req.method === 'GET' || req.method === 'HEAD') {
-      var cached = self.lru.get(req.url)
-      if (cached) return cached.emit('request', req, resp)
-      
-      // not in cache
-      req.route = self.routes.match(req.url)
-      if (!req.route) return resp.notfound()
-      cached = req.route.fn().request(req, resp)
-      self.lru.set(req.url, cached)
+    var l = Object.keys(self.conditions).length
+    if (l === 0) {
+      finish()
     }
+    var i = 0
+      , met = {}
+      ;
+    for (var name in self.conditions) {
+      (function (name){
+        self.conditions[name](req, resp, function (e, bool) {
+          if (e) met[name] = false
+          else met[name] = bool
+          i += 1
+          if (i === l) finish()
+        })
+      })(name)
+    }
+    
+    function finish () {
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        var cached = self.lru.get(req.url)
+        if (cached) return cached.emit('request', req, resp)
+      
+        // not in cache
+        req.route = self.routes.match(req.url)
+        if (!req.route) return resp.notfound()
+        if (!req.route.fn) return resp.notfound()
+        
+        var r = req.route.fn()
+        // TODO implement must over the conditions system
+        cached = r.request(req, resp)
+        self.lru.set(req.url, cached)
+      }
+    }
+    
   })
   
   function onRequest (req, resp) {
@@ -60,9 +86,10 @@ Application.prototype.route = function (pattern, cb) {
 Application.prototype.flush = function (pattern) {
   var self = this
   if (!pattern) self.lru.reset()
-  Object.keys(self.lru.cache).forEach(function (key) {
-    // find matches and remove them
-  })
+}
+Application.prototype.condition = function (name, handler) {
+  this.conditions[name] = handler
+  return this
 }
 
 function Route (app, pattern, cb) {
