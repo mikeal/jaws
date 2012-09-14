@@ -66,8 +66,15 @@ function Application (opts) {
         // TODO implement must over the conditions system
         cached = r.request(req, resp)
         self.lru.set(req.url, cached)
+        return
       }
+      req.route = self.routes.match(req.url)
+      if (!req.route) return resp.notfound()
+      if (!req.route.fn) return resp.notfound()
+      r.request(req, resp)
     }
+    
+    
     
   })
   
