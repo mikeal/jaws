@@ -20,6 +20,7 @@ function Application (opts) {
   self.lru = lrucache(opts)
   self.routes = new mapleTree.RouteTree()
   self.conditions = {}
+  self.globalHeaders = {}
   
   self.on('request', function (req, resp) {
     resp.notfound = function (data) {
@@ -53,6 +54,10 @@ function Application (opts) {
     }
     
     function finish () {
+      for (var i in self.globalHeaders) {
+        resp.setHeader(i, self.globalHeaders[i])
+      }
+      
       if (req.method === 'GET' || req.method === 'HEAD') {
         var cached = self.lru.get(req.url)
         if (cached) return cached.emit('request', req, resp)
@@ -97,6 +102,9 @@ Application.prototype.flush = function (pattern) {
 Application.prototype.condition = function (name, handler) {
   this.conditions[name] = handler
   return this
+}
+Application.prototype.addHeader = function (name, value) {
+  this.globalHeaders[name] = value
 }
 
 function Route (app, pattern, cb) {
