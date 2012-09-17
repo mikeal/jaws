@@ -7,6 +7,7 @@ var fs = require('fs')
   , events = require('events')
   , crypto = require('crypto')
   , zlib = require('zlib')
+  , domain = require('domain')
   
   , mime = require('mime')
   , mapleTree = require('mapleTree')
@@ -23,69 +24,81 @@ function Application (opts) {
   self.globalHeaders = {}
   
   self.on('request', function (req, resp) {
-    resp.notfound = function (data) {
-      resp.setHeader('content-type', 'text/plain')
-      resp.statusCode = 404
-      resp.end(data || 'Not Found')
-    }
-    
-    resp.html = function (data) {
-      resp.setHeader('content-type', 'text/html')
-      resp.statusCode = 200
-      resp.end(data)
-    }
-    
-    var l = Object.keys(self.conditions).length
-    if (l === 0) {
-      finish()
-    }
-    var i = 0
-      , met = {}
-      ;
-    for (var name in self.conditions) {
-      (function (name){
-        self.conditions[name](req, resp, function (e, bool) {
-          if (e) met[name] = false
-          else met[name] = bool
-          i += 1
-          if (i === l) finish()
-        })
-      })(name)
-    }
-    
-    function finish () {
-      for (var i in self.globalHeaders) {
-        resp.setHeader(i, self.globalHeaders[i])
+    var d = domain.create()
+    d.on('error', function (e) {
+      resp.statusCode = 500
+      try {
+        resp.setHeader('content-type', 'text-plain')
+        resp.end(e.stack)
+      } catch(e) {}
+    })
+    d.run(function () {
+      
+      resp.notfound = function (data) {
+        resp.setHeader('content-type', 'text/plain')
+        resp.statusCode = 404
+        resp.end(data || 'Not Found')
       }
+    
+      resp.html = function (data) {
+        resp.setHeader('content-type', 'text/html')
+        resp.statusCode = 200
+        resp.end(data)
+      }
+    
+      var l = Object.keys(self.conditions).length
+      if (l === 0) {
+        finish()
+      }
+      var i = 0
+        , met = {}
+        ;
+      for (var name in self.conditions) {
+        (function (name){
+          self.conditions[name](req, resp, function (e, bool) {
+            if (e) met[name] = false
+            else met[name] = bool
+            i += 1
+            if (i === l) finish()
+          })
+        })(name)
+      }
+    
+      function finish () {
+        for (var i in self.globalHeaders) {
+          resp.setHeader(i, self.globalHeaders[i])
+        }
       
-      if (req.method === 'GET' || req.method === 'HEAD') {
-        var cached = self.lru.get(req.url)
-        if (cached) return cached.emit('request', req, resp)
+        if (req.method === 'GET' || req.method === 'HEAD') {
+          var cached = self.lru.get(req.url)
+          if (cached) return cached.emit('request', req, resp)
       
-        // not in cache
+          // not in cache
+          req.route = self.routes.match(req.url)
+          if (!req.route) return resp.notfound()
+          if (!req.route.fn) return resp.notfound()
+        
+          var r = req.route.fn()
+          // TODO implement must over the conditions system
+          if (!r.request) {
+            console.error(r)
+            return resp.notfound()
+          }
+          cached = r.request(req, resp)
+          self.lru.set(req.url, cached)
+          return
+        }
         req.route = self.routes.match(req.url)
         if (!req.route) return resp.notfound()
         if (!req.route.fn) return resp.notfound()
-        
-        var r = req.route.fn()
-        // TODO implement must over the conditions system
-        if (!r.request) {
+        if (!r.request) { 
           console.error(r)
           return resp.notfound()
         }
-        cached = r.request(req, resp)
-        self.lru.set(req.url, cached)
-        return
+        r.request(req, resp)
       }
-      req.route = self.routes.match(req.url)
-      if (!req.route) return resp.notfound()
-      if (!req.route.fn) return resp.notfound()
-      if (!r.request) { 
-        console.error(r)
-        return resp.notfound()
-      }
-      r.request(req, resp)
-    }
+      
+    })
   })
   
   function onRequest (req, resp) {
