@@ -69,6 +69,7 @@ function Application (opts) {
         
         var r = req.route.fn()
         // TODO implement must over the conditions system
+        if (!r.request) console.error(r)
         cached = r.request(req, resp)
         self.lru.set(req.url, cached)
         return
@@ -78,9 +79,6 @@ function Application (opts) {
       if (!req.route.fn) return resp.notfound()
       r.request(req, resp)
     }
-    
-    
-    
   })
   
   function onRequest (req, resp) {
