@@ -8,6 +8,7 @@ var fs = require('fs')
   , crypto = require('crypto')
   , zlib = require('zlib')
   , domain = require('domain')
+  , urlparse = require('url').parse
   
   , mime = require('mime')
   , mapleTree = require('mapleTree')
@@ -74,7 +75,8 @@ function Application (opts) {
           if (cached) return cached.emit('request', req, resp)
       
           // not in cache
-          req.route = self.routes.match(req.url)
+          var url = urlparse('http://localhost' + req.url).pathname
+          req.route = self.routes.match(url)
           if (!req.route) return resp.notfound()
           if (!req.route.fn) return resp.notfound()
         
@@ -87,7 +89,7 @@ function Application (opts) {
         req.route = self.routes.match(req.url)
         if (!req.route) return resp.notfound()
         if (!req.route.fn) return resp.notfound()
-        r = req.route.fn()
+        var r = req.route.fn()
         r.request(req, resp)
       }
       
