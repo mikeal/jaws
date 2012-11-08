@@ -69,24 +69,26 @@ function Application (opts) {
         for (var i in self.globalHeaders) {
           resp.setHeader(i, self.globalHeaders[i])
         }
+        
+        var u = urlparse('http://localhost' + req.url).pathname
       
         if (req.method === 'GET' || req.method === 'HEAD') {
           var cached = self.lru.get(req.url)
           if (cached) return cached.emit('request', req, resp)
       
           // not in cache
-          var url = urlparse('http://localhost' + req.url).pathname
-          req.route = self.routes.match(url)
+          
+          req.route = self.routes.match(u)
           if (!req.route) return resp.notfound()
           if (!req.route.fn) return resp.notfound()
         
           var r = req.route.fn()
           // TODO implement must over the conditions system
           cached = r.request(req, resp)
-          self.lru.set(req.url, cached)
+          self.lru.set(u, cached)
           return
         }
-        req.route = self.routes.match(req.url)
+        req.route = self.routes.match(u)
         if (!req.route) return resp.notfound()
         if (!req.route.fn) return resp.notfound()
         var r = req.route.fn()
