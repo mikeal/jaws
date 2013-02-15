@@ -71,27 +71,32 @@ function Application (opts) {
         }
         
         var u = urlparse('http://localhost' + req.url).pathname
+        
+        function getRoute () {
+          req.route = self.routes.match(u)
+          if (!req.route || !req.route.fn) {
+            resp.notfound()
+            return null
+          }
+          return req.route.fn()          
+        }
       
         if (req.method === 'GET' || req.method === 'HEAD') {
           var cached = self.lru.get(req.url)
           if (cached) return cached.emit('request', req, resp)
       
-          // not in cache
-          
-          req.route = self.routes.match(u)
-          if (!req.route) return resp.notfound()
-          if (!req.route.fn) return resp.notfound()
-        
-          var r = req.route.fn()
+          var r = getRoute()
+          if (!r) return r
           // TODO implement must over the conditions system
-          cached = r.request(req, resp)
-          self.lru.set(u, cached)
-          return
+          if (r._cachable) {
+            cached = r.request(req, resp)
+            self.lru.set(u, cached)
+            return
+          }
+        } else {
+          var r = getRoute()
+          if (!r) return r
         }
-        req.route = self.routes.match(u)
-        if (!req.route) return resp.notfound()
-        if (!req.route.fn) return resp.notfound()
-        var r = req.route.fn()
         r.request(req, resp)
       }
       
@@ -123,24 +128,28 @@ Application.prototype.addHeader = function (name, value) {
 }
 
 function Route (app, pattern, cb) {
-  this.app = app
-  this.pattern = pattern
+  var self = this
+  self.app = app
+  self.pattern = pattern
+  self._cachable = true
   if (cb) {
-    this.request = function (req, resp) {
-      var cached = new Cached()
+    self.request = function (req, resp) {
+      if (self._cachable) {
+        var cached = new Cached()
       
-      resp._write = resp.write
-      resp.write = function write (chunk) {
-        if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
-        cached.write(chunk)
-        resp._write(chunk)
-      }
+        resp._write = resp.write
+        resp.write = function write (chunk) {
+          if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
+          cached.write(chunk)
+          resp._write(chunk)
+        }
       
-      resp._end = resp.end
-      resp.end = function end (chunk) {
-        if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
-        cached.end(chunk)
-        resp._end(chunk)
+        resp._end = resp.end
+        resp.end = function end (chunk) {
+          if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
+          cached.end(chunk)
+          resp._end(chunk)
+        }
       }
       
       cb(req, resp)
@@ -189,6 +198,10 @@ Route.prototype.file = function (path, watchFile) {
     cached.emit('request', req, resp)
     return cached
   }
+}
+Route.prototype.nocache = function () {
+  this._cachable = false
+  return this
 }
 
 function Cached () {
