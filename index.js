@@ -35,34 +35,25 @@ function Application (opts) {
     })
     d.run(function () {
       
-      resp.notfound = function (data) {
+      resp.error = function (err, statusCode) {
+        resp.statusCode = statusCode || 500
         resp.setHeader('content-type', 'text/plain')
-        resp.statusCode = 404
-        resp.end(data || 'Not Found')
+        if (typeof err === 'string') {
+          resp.end(err)
+        } else {
+          if (err.message) resp.end(err.message)
+          else resp.end('error')
+        }
+      }
+      
+      resp.notfound = function (data) {
+        resp.error(data || 'Not Found', 404)
       }
     
       resp.html = function (data) {
         resp.setHeader('content-type', 'text/html')
         resp.statusCode = 200
         resp.end(data)
-      }
-    
-      var l = Object.keys(self.conditions).length
-      if (l === 0) {
-        finish()
-      }
-      var i = 0
-        , met = {}
-        ;
-      for (var name in self.conditions) {
-        (function (name){
-          self.conditions[name](req, resp, function (e, bool) {
-            if (e) met[name] = false
-            else met[name] = bool
-            i += 1
-            if (i === l) finish()
-          })
-        })(name)
       }
     
       function finish () {
@@ -72,33 +63,43 @@ function Application (opts) {
         
         var u = urlparse('http://localhost' + req.url).pathname
         
-        function getRoute () {
+        function getRoute (cb) {
           req.route = self.routes.match(u)
           if (!req.route || !req.route.fn) {
             resp.notfound()
-            return null
+            return
           }
-          return req.route.fn()          
+          var r = req.route.fn()
+          r.verify(req, resp, function () {
+            cb(r)
+          })
         }
       
         if (req.method === 'GET' || req.method === 'HEAD') {
           var cached = self.lru.get(req.url)
-          if (cached) return cached.emit('request', req, resp)
-      
-          var r = getRoute()
-          if (!r) return r
-          // TODO implement must over the conditions system
-          if (r._cachable) {
-            cached = r.request(req, resp)
-            self.lru.set(u, cached)
-            return
-          }
+          
+          getRoute(function (r) {
+            // TODO implement must over the conditions system
+            if (cached) return cached.emit('request', req, resp)
+
+            if (r._cachable) {
+              cached = r.request(req, resp)
+              self.lru.set(u, cached)
+              return
+            }
+            
+            r.request(req, resp)
+          })
+          
         } else {
-          var r = getRoute()
-          if (!r) return r
+          getRoute(function (r) {
+            r.request(req, resp)
+          }) 
         }
-        r.request(req, resp)
+        
       }
+      
+      self.verify(req, resp, finish)
       
     })
   })
@@ -119,12 +120,54 @@ Application.prototype.flush = function (pattern) {
   var self = this
   if (!pattern) self.lru.reset()
 }
-Application.prototype.condition = function (name, handler) {
-  this.conditions[name] = handler
-  return this
-}
 Application.prototype.addHeader = function (name, value) {
   this.globalHeaders[name] = value
+}
+Application.prototype.condition = condition
+
+function condition (name, statusCode, handler) {
+  if (!statusCode) {
+    handler = name
+    statusCode = 500
+    name = 'unnamed-'+Math.floor(Math.random()*11111)
+  } else if (!handler) {
+    handler = statusCode
+    statusCode = 500
+  }
+  
+  this.conditions[name] = [statusCode, handler]
+  return this
+}
+
+Application.prototype.verify = verify
+
+function verify (req, resp, next) {
+  var self = this
+  var l = Object.keys(self.conditions).length
+  if (l === 0) {
+    next()
+  }
+  var i = 0
+    , met = {}
+    ;
+    
+  for (var name in self.conditions) {
+    ;(function (name) {
+      var handler = self.conditions[name][1]
+        , statusCode = self.conditions[name][0]
+        , failed = false
+        ;
+      handler(req, resp, function (e, bool) {
+        if (failed) return
+        if (e) {
+          failed = true
+          return resp.error(e, statusCode)
+        }
+        i += 1
+        if (i === l) next()
+      })
+    })(name)
+  }
 }
 
 function Route (app, pattern, cb) {
@@ -132,6 +175,7 @@ function Route (app, pattern, cb) {
   self.app = app
   self.pattern = pattern
   self._cachable = true
+  self.conditions = {}
   if (cb) {
     self.request = function (req, resp) {
       if (self._cachable) {
@@ -203,6 +247,8 @@ Route.prototype.nocache = function () {
   this._cachable = false
   return this
 }
+Route.prototype.condition = condition
+Route.prototype.verify = verify
 
 function Cached () {
   var self = this
