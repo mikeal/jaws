@@ -89,18 +89,15 @@ function Application (opts) {
             }
             
             r.request(req, resp)
-          })
-          
+          }) 
         } else {
           getRoute(function (r) {
             r.request(req, resp)
           }) 
         }
-        
       }
       
       self.verify(req, resp, finish)
-      
     })
   })
   
