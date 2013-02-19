@@ -9,11 +9,18 @@ var fs = require('fs')
   , zlib = require('zlib')
   , domain = require('domain')
   , urlparse = require('url').parse
+  , qs = require('querystring')
   
   , mime = require('mime')
   , mapleTree = require('mapleTree')
   , lrucache = require('lru-cache')
   ;
+
+function getMime (contenttype) {
+  if (contenttype.slice(0, 'application/json'.length) === 'application/json') return 'json'
+  if (contenttype.slice(0, 'application/x-www-form-urlencoded'.length) === 'application/x-www-form-urlencoded') return 'url'
+  return null
+}
 
 function Application (opts) {
   var self = this
@@ -41,8 +48,45 @@ function Application (opts) {
     d.add(resp)
     d.run(function () {
       
+      req.body = function (cb) {
+        var buffers = []
+          , size = 0
+          , mime = getMime(req.headers['content-type'] || '')
+          ;
+        if (!mime) {
+          var e = new Error('invalid content type.')
+          e.statusCode = 400
+          return cb(e)
+        }
+        
+        req.on('data', function (chunk) {
+          buffers.push(chunk)
+          size += chunk.length
+        })
+        req.on('end', function () {
+          var i = 0
+          var buffer = new Buffer(size)
+          buffers.forEach(function (chunk) {
+            chunk.copy(buffer, i, 0, chunk.length)
+            i += chunk.length
+          })
+
+          if (mime === 'json') {
+            try {cb(null, JSON.parse(buffer.toString()))}
+            catch (e) {cb(e)}
+          } else if (mime === 'url') {
+            try {cb(null, qs.parse(buffer.toString()))}
+            catch (e) {cb(e)}
+          } else {
+            var e = new Error('invalid content type.')
+            e.statusCode = 400
+            cb(e)
+          }
+        })
+      }
+      
       resp.error = function (err, statusCode) {
-        resp.statusCode = statusCode || 500
+        resp.statusCode = statusCode || err.statusCode || 500
         resp.setHeader('content-type', 'text/plain')
         if (typeof err === 'string') {
           resp.end(err)
@@ -113,8 +157,8 @@ function Application (opts) {
             }
           })
         }
-      
         if (req.method === 'GET' || req.method === 'HEAD') {
+          
           var cached = self.lru.get(req.url)
           
           getRoute(function (r) {
@@ -215,7 +259,7 @@ function Route (app, pattern, cb) {
   self._validate = []
   if (cb) {
     self.request = function (req, resp) {
-      if (self._cachable) {
+      if (self._cachable && (req.method === 'GET' || req.method === 'HEAD' )) {
         var cached = new Cached()
       
         resp._write = resp.write
