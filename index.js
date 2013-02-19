@@ -27,12 +27,18 @@ function Application (opts) {
   self.on('request', function (req, resp) {
     var d = domain.create()
     d.on('error', function (e) {
+      console.error(e.stack)
+      
       resp.statusCode = 500
-      try {
+      if (!resp._headerSent) {
         resp.setHeader('content-type', 'text-plain')
-        resp.end(e.stack)
-      } catch(e) {}
+        resp.write(e.stack)
+      }      
+      try { resp.end() }
+      catch(e) {}
     })
+    d.add(req)
+    d.add(resp)
     d.run(function () {
       
       resp.error = function (err, statusCode) {
@@ -70,8 +76,41 @@ function Application (opts) {
             return
           }
           var r = req.route.fn()
+          
+          if (r._methods && r._methods.indexOf(req.method) === -1) return resp.error('Method not allowed.', 405)
+                    
+          // Route.condition() handling
           r.verify(req, resp, function () {
-            cb(r)
+            function statusCode (name) {
+              if (self.conditions[name]) return self.conditions[name][0]
+              if (r.conditions[name]) return r.conditions[name][0]
+              return 500
+            }
+            
+            // Route.must() handling/
+            if (r._must) {
+              for (var i=0;i<r._must.length;i++) {
+                // resp.error('Condition unmet: '+r._must[i], statusCode(r._must[i]))
+                if (!req._met[r._must[i]]) return resp.error('Condition unmet: '+r._must[i], statusCode(r._must[i]))
+              }
+            }
+            
+            // Route.validate() handling
+            if (r._validate.length) {
+              var i = 0
+              r._validate.forEach(function (v) {
+                var statusCode = v[0]
+                  , validate = v[1]
+                  ;
+                validate(req, resp, function (e) {
+                  if (e) return resp.error(e, statusCode)
+                  i += 1
+                  if (i === r._validate.length) cb(r)
+                })
+              })
+            } else {
+              cb(r)
+            }
           })
         }
       
@@ -79,7 +118,6 @@ function Application (opts) {
           var cached = self.lru.get(req.url)
           
           getRoute(function (r) {
-            // TODO implement must over the conditions system
             if (cached) return cached.emit('request', req, resp)
 
             if (r._cachable) {
@@ -97,6 +135,7 @@ function Application (opts) {
         }
       }
       
+      // Application.condition() handling
       self.verify(req, resp, finish)
     })
   })
@@ -145,8 +184,7 @@ function verify (req, resp, next) {
     next()
   }
   var i = 0
-    , met = {}
-    ;
+  req._met = {}
     
   for (var name in self.conditions) {
     ;(function (name) {
@@ -160,6 +198,7 @@ function verify (req, resp, next) {
           failed = true
           return resp.error(e, statusCode)
         }
+        req._met[name] = bool
         i += 1
         if (i === l) next()
       })
@@ -173,6 +212,7 @@ function Route (app, pattern, cb) {
   self.pattern = pattern
   self._cachable = true
   self.conditions = {}
+  self._validate = []
   if (cb) {
     self.request = function (req, resp) {
       if (self._cachable) {
@@ -246,6 +286,23 @@ Route.prototype.nocache = function () {
 }
 Route.prototype.condition = condition
 Route.prototype.verify = verify
+
+Route.prototype.must = function () {
+  this._must = Array.prototype.slice.call(arguments)
+  return this
+}
+Route.prototype.validate = function (statusCode, handler) {
+  if (!handler) {
+    handler = statusCode
+    statusCode = 500
+  }
+  this._validate.push([statusCode, handler])
+  return this
+}
+Route.prototype.methods = function () {
+  this._methods = Array.prototype.slice.call(arguments).map(function (m) {return m.toUpperCase()})
+  return this
+}
 
 function Cached () {
   var self = this
