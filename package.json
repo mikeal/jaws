@@ -2,17 +2,19 @@
   "author": "Mikeal Rogers <mikeal.rogers@gmail.com>",
   "name": "jaws",
   "description": "Build HTTP applications as a cache.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "main": "index.js",
   "scripts": {
     "test": "node test/run.js"
   },
   "dependencies": {
-    "lru-cache": "~2.0.1", 
-    "mapleTree": "~0.2.1", 
-    "mime": "~1.2.7" 
+    "lru-cache": "~2.0.4",
+    "mapleTree": "~0.2.2",
+    "mime": "~1.2.9"
   },
-  "devDependencies": {"request":"~2.10.0"},
+  "devDependencies": {
+    "request": "~2.10.0"
+  },
   "optionalDependencies": {},
   "engines": {
     "node": "*"
