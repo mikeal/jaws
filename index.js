@@ -139,22 +139,7 @@ function Application (opts) {
               }
             }
             
-            // Route.validate() handling
-            if (r._validate.length) {
-              var i = 0
-              r._validate.forEach(function (v) {
-                var statusCode = v[0]
-                  , validate = v[1]
-                  ;
-                validate(req, resp, function (e) {
-                  if (e) return resp.error(e, statusCode)
-                  i += 1
-                  if (i === r._validate.length) cb(r)
-                })
-              })
-            } else {
-              cb(r)
-            }
+            cb(r)
           })
         }
         if (req.method === 'GET' || req.method === 'HEAD') {
@@ -256,7 +241,6 @@ function Route (app, pattern, cb) {
   self.pattern = pattern
   self._cachable = true
   self.conditions = {}
-  self._validate = []
   if (cb) {
     self.request = function (req, resp) {
       if (self._cachable && (req.method === 'GET' || req.method === 'HEAD' )) {
@@ -333,14 +317,6 @@ Route.prototype.verify = verify
 
 Route.prototype.must = function () {
   this._must = Array.prototype.slice.call(arguments)
-  return this
-}
-Route.prototype.validate = function (statusCode, handler) {
-  if (!handler) {
-    handler = statusCode
-    statusCode = 500
-  }
-  this._validate.push([statusCode, handler])
   return this
 }
 Route.prototype.methods = function () {
