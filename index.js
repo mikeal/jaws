@@ -14,6 +14,7 @@ var fs = require('fs')
   , mime = require('mime')
   , mapleTree = require('mapleTree')
   , lrucache = require('lru-cache')
+  , safeStringify = require('json-stringify-safe')
   ;
 
 function getMime (contenttype) {
@@ -104,6 +105,14 @@ function Application (opts) {
         resp.setHeader('content-type', 'text/html')
         resp.statusCode = 200
         resp.end(data)
+      }
+      
+      resp.json = function (obj) {
+        var body = safeStringify(obj)
+        if (!body) return resp.error(new Error('JSON.stringify() failed'))
+        resp.setHeader('content-type', 'application/json')
+        resp.statusCode = 200
+        resp.end(body)
       }
     
       function finish () {
