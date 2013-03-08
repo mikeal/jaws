@@ -115,63 +115,61 @@ function Application (opts) {
         resp.end(body)
       }
     
-      function finish () {
-        for (var i in self.globalHeaders) {
-          resp.setHeader(i, self.globalHeaders[i])
+      for (var i in self.globalHeaders) {
+        resp.setHeader(i, self.globalHeaders[i])
+      }
+        
+      var u = urlparse('http://localhost' + req.url).pathname
+        
+      function getRoute (cb) {
+        req.route = self.routes.match(u)
+        if (!req.route || !req.route.fn) {
+          resp.notfound()
+          return
         }
+        var r = req.route.fn()
+          
+        if (r._methods && r._methods.indexOf(req.method) === -1) return resp.error('Method not allowed.', 405)
+                    
+        // condition() handling
+        var done = 0
+        function next () {
+          if (done === 0) return done += 1
+          // Route.must() handling/
+          if (r._must) {
+            for (var i=0;i<r._must.length;i++) {
+              var v = req._met[r._must[i]]
+              if (!v) return resp.error(new Error('Route requires condition that does not exist.'))
+              if (!v[0]) return resp.error(v[1], v[2] || 500)
+            }
+          }
+          cb(r)
+        }
+        self.verify(req, resp, next)
+        r.verify(req, resp, next)
+      }
         
-        var u = urlparse('http://localhost' + req.url).pathname
-        
-        function getRoute (cb) {
-          req.route = self.routes.match(u)
-          if (!req.route || !req.route.fn) {
-            resp.notfound()
+      if (req.method === 'GET' || req.method === 'HEAD') {
+          
+        var cached = self.lru.get(req.url)
+          
+        getRoute(function (r) {
+          if (cached) return cached.emit('request', req, resp)
+
+          if (r._cachable) {
+            cached = r.request(req, resp)
+            self.lru.set(u, cached)
             return
           }
-          var r = req.route.fn()
-          
-          if (r._methods && r._methods.indexOf(req.method) === -1) return resp.error('Method not allowed.', 405)
-                    
-          // condition() handling
-          var done = 0
-          function next () {
-            if (done === 0) return done += 1
-            // Route.must() handling/
-            if (r._must) {
-              for (var i=0;i<r._must.length;i++) {
-                var v = req._met[r._must[i]]
-                if (!v) return resp.error(new Error('Route requires condition that does not exist.'))
-                if (!v[0]) return resp.error(v[1], v[2] || 500)
-              }
-            }
-            cb(r)
-          }
-          self.verify(req, resp, next)
-          r.verify(req, resp, next)
-        }
-        
-        if (req.method === 'GET' || req.method === 'HEAD') {
-          
-          var cached = self.lru.get(req.url)
-          
-          getRoute(function (r) {
-            if (cached) return cached.emit('request', req, resp)
-
-            if (r._cachable) {
-              cached = r.request(req, resp)
-              self.lru.set(u, cached)
-              return
-            }
             
-            r.request(req, resp)
-          }) 
-        } else {
-          getRoute(function (r) {
-            r.request(req, resp)
-          }) 
-        }
+          r.request(req, resp)
+        }) 
+      } else {
+        getRoute(function (r) {
+          r.request(req, resp)
+        }) 
       }
-      finish()
+
     })
   })
   
