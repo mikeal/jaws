@@ -132,25 +132,24 @@ function Application (opts) {
           
           if (r._methods && r._methods.indexOf(req.method) === -1) return resp.error('Method not allowed.', 405)
                     
-          // Route.condition() handling
-          r.verify(req, resp, function () {
-            function statusCode (name) {
-              if (self.conditions[name]) return self.conditions[name][0]
-              if (r.conditions[name]) return r.conditions[name][0]
-              return 500
-            }
-            
+          // condition() handling
+          var done = 0
+          function next () {
+            if (done === 0) return done += 1
             // Route.must() handling/
             if (r._must) {
               for (var i=0;i<r._must.length;i++) {
-                // resp.error('Condition unmet: '+r._must[i], statusCode(r._must[i]))
-                if (!req._met[r._must[i]]) return resp.error('Condition unmet: '+r._must[i], statusCode(r._must[i]))
+                var v = req._met[r._must[i]]
+                if (!v) return resp.error(new Error('Route requires condition that does not exist.'))
+                if (!v[0]) return resp.error(v[1], v[2] || 500)
               }
             }
-            
             cb(r)
-          })
+          }
+          self.verify(req, resp, next)
+          r.verify(req, resp, next)
         }
+        
         if (req.method === 'GET' || req.method === 'HEAD') {
           
           var cached = self.lru.get(req.url)
@@ -172,9 +171,7 @@ function Application (opts) {
           }) 
         }
       }
-      
-      // Application.condition() handling
-      self.verify(req, resp, finish)
+      finish()
     })
   })
   
@@ -207,14 +204,14 @@ function condition (name, statusCode, handler) {
   if (!statusCode) {
     handler = name
     statusCode = 500
-    name = 'unnamed-'+Math.floor(Math.random()*11111)
+    name = 'unnamed-'+Math.floor(Math.random()*111111111)
   } else if (!handler) {
     handler = statusCode
     statusCode = 500
   }
   
   this.conditions[name] = [statusCode, handler]
-  return this
+  return name
 }
 
 Application.prototype.verify = verify
@@ -232,15 +229,13 @@ function verify (req, resp, next) {
     ;(function (name) {
       var handler = self.conditions[name][1]
         , statusCode = self.conditions[name][0]
-        , failed = false
         ;
-      handler(req, resp, function (e, bool) {
-        if (failed) return
+      handler(req, resp, function (e, o) {
         if (e) {
-          failed = true
-          return resp.error(e, statusCode)
+          req._met[name] = [false, e, statusCode]
+        } else {
+          req._met[name] = [true, o]
         }
-        req._met[name] = bool
         i += 1
         if (i === l) next()
       })
@@ -325,7 +320,11 @@ Route.prototype.nocache = function () {
   this._cachable = false
   return this
 }
-Route.prototype.condition = condition
+Route.prototype.condition = function () {
+  var name = condition.apply(this, arguments)
+  this.must(name)
+  return this
+}
 Route.prototype.verify = verify
 
 Route.prototype.must = function () {

@@ -9,51 +9,34 @@ var jaws = require('../index')
 var app = jaws()
 
 app
-.condition('authorized', 401, function (req, resp, cb) {
-  if (req.url === '/auth') cb(new Error('not authorized'))
-  else cb(null)
+.condition('auth', 401, function (req, resp, cb) {
+  cb(new Error('not authorized'))
 })
-.condition('err', function (req, resp, cb) {
+app.condition('err', function (req, resp, cb) {
   if (req.url === '/err') cb(new Error('500 error'))
   else cb(null)
-})
-.condition(function (req, resp, cb) {
-  if (req.url === '/no') cb(new Error('no options'))
-  else cb(null)
-})
-.condition(function (req, resp, cb) {
-  if (req.url === '/future') {
-    setTimeout(function () {
-      req.blah = 'test'
-      cb(null)
-    }, 5)
-  } else cb(null)
 })
 
 app.route('/auth', function (req, resp) {
   resp.statusCode = 200
   resp.end('ok')
 })
+.must('auth')
 
 app.route('/err', function (req, resp) {
   resp.statusCode = 200
   resp.end('ok')
 })
+.must('err')
 
 app.route('/no', function (req, resp) {
   resp.statusCode = 200
   resp.end('ok')
 })
-
-app.route('/future', function (req, resp) {
-  resp.statusCode = 200
-  resp.end(req.blah)
-})
-
-
+.must('thisdoesntexit')
 
 app.httpServer.listen(8080, function () {
-  var testsLength = 4
+  var testsLength = 3
     , i = 0
     ;
   function done () {
@@ -79,13 +62,8 @@ app.httpServer.listen(8080, function () {
     if (e) throw e
     assert.equal(500, resp.statusCode)
     assert.notEqual('ok', body)
+    assert.equal(body, 'Route requires condition that does not exist.')
     done()
   })
-  
-  var r = request.post('http://localhost:8080/future', function (e, resp, body) {
-    if (e) throw e
-    assert.equal(200, resp.statusCode)
-    assert.equal('test', body)
-    done()
-  })
+
 })
