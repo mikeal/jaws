@@ -8,9 +8,9 @@ var jaws = require('../index')
 
 var app = jaws()
 
-app.route('/test').file(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'match.js'))
+app.route('/test').file(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'treeRouter.js'))
 
-var buff = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'match.js'))
+var buff = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'treeRouter.js'))
 
 app.httpServer.listen(8080, function () {
   request.get('http://localhost:8080/test', function (e, resp, body) {
