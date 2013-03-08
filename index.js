@@ -183,7 +183,11 @@ Application.prototype.route = function (pattern, cb) {
 }
 Application.prototype.flush = function (pattern) {
   var self = this
-  if (!pattern) self.lru.reset()
+  if (!pattern) return self.lru.reset()
+  var match = mapleTree.pattern(pattern) //returns a function
+  self.lru.keys().forEach(function (url) {
+    if (match(url)) self.lru.del(url)
+  })
 }
 Application.prototype.addHeader = function (name, value) {
   this.globalHeaders[name] = value
