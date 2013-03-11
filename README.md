@@ -125,13 +125,13 @@ Jaws sparingly adds some methods to the node's request and response objects for 
 
 #### Request
 
-* body(cb) - Parse the incoming request body and call `cb`. JSON and URL encoded bodies will be parsed. cb is standard callback interface `function (error, body) {}`.
-* route - A [mapleTree](https://github.com/saambarati/mapleTree) route instance. `req.route.params` is most used and holds the parsed request params.
+* `body(cb)` - Parse the incoming request body and call `cb`. JSON and URL encoded bodies will be parsed. cb is standard callback interface `function (error, body) {}`.
+* `route` - A [mapleTree](https://github.com/saambarati/mapleTree) route instance. `req.route.params` is most used and holds the parsed request params.
 
 #### Response
 
-* error(err, [statusCode]) - Return an HTTP error. Accept instances of Error and text and, optionally, a statusCode (defaults to 500).
-* notfound() - Return an HTTP 404.
-* html(body) - Write the HTML body, set proper headers, and end the response.
-* json(obj) - Safely serialize (uses [json-stringify-safe](https://github.com/isaacs/json-stringify-safe)) the object to JSON, set proper headers, end the request.
+* `error(err, [statusCode])` - Return an HTTP error. Accept instances of Error and text and, optionally, a statusCode (defaults to 500).
+* `notfound()` - Return an HTTP 404.
+* `html(body)` - Write the HTML body, set proper headers, and end the response.
+* `json(obj)` - Safely serialize (uses [json-stringify-safe](https://github.com/isaacs/json-stringify-safe)) the object to JSON, set proper headers, end the request.
 
