@@ -58,7 +58,7 @@ app.condition('auth', 401, function (req, res, cb) {
 app.route('/me', function (req, res) {
   res.html(templateRender(req.user))
 })
-.must(auth)
+.must('auth')
 
 // This will still work without auth because there's no `must()` call.
 app.route('/').file('index.html')
