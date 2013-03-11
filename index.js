@@ -140,7 +140,7 @@ function Application (opts) {
             for (var i=0;i<r._must.length;i++) {
               var v = req._met[r._must[i]]
               if (!v) return resp.error(new Error('Route requires condition that does not exist.'))
-              if (!v[0]) return resp.error(v[1], v[2] || 500)
+              if (v[0]) return resp.error(v[0], v[1] || 500)
             }
           }
           cb(r)
@@ -230,9 +230,9 @@ function verify (req, resp, next) {
         ;
       handler(req, resp, function (e, o) {
         if (e) {
-          req._met[name] = [false, e, statusCode]
+          req._met[name] = [e, statusCode]
         } else {
-          req._met[name] = [true, o]
+          req._met[name] = [null, o]
         }
         i += 1
         if (i === l) next()
