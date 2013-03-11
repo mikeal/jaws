@@ -36,7 +36,7 @@ app.route('/me', function (req, res) {
   res.html(templateRender(req.user))
 })
 .must(function (req, res, cb) {
-  if (!req.headers.cookie) cb(null, false)
+  if (!req.headers.cookie) cb(new Error('No cookie header'))
   getUserByToken(req.headers.cookie, function (e, user) {
     req.user = user
     cb(e, user)
@@ -48,7 +48,7 @@ You can also add named conditions to the application. All conditions will fire f
 
 ```javascript
 app.condition('auth', 401, function (req, res, cb) {
-  if (!req.headers.cookie) cb(null, false)
+  if (!req.headers.cookie) cb(new Error('No cookie header'))
   getUserByToken(req.headers.cookie, function (e, user) {
     req.user = user
     cb(e, user)
@@ -105,7 +105,7 @@ app.route('/dynamic',function (req, res) {
 
 #### Application
 
-* `condition(name, [statusCode], cb)` - Add a condition globally to the application. cb in form of HTTP req/res + final callback `function (req, res, cb) {cb(error, success)}`.
+* `condition(name, [statusCode], cb)` - Add a condition globally to the application. cb in form of HTTP req/res + final callback `function (req, res, cb) {cb(error, success)}`. All conditions will fire for all requests but only routes that use `must()` will get an HTTP error if the callback gets an error.
 * `route(pattern, [cb])` - Create and return a Route instance for `pattern`. Optionally pass a handler in form of HTTP req/res `function (req, res) {}`.
 * `flush([pattern])` - Flush cache entries that match `pattern`. Flushes entire cache when no pattern is given.
 * `addHeader(name, value)` - Add a header to all responses.
