@@ -72,17 +72,20 @@ function Application (opts) {
             i += chunk.length
           })
 
+          var body
           if (mime === 'json') {
-            try {cb(null, JSON.parse(buffer.toString()))}
+            try {body = JSON.parse(buffer.toString())}
             catch (e) {cb(e)}
           } else if (mime === 'url') {
-            try {cb(null, qs.parse(buffer.toString()))}
+            try {body = qs.parse(buffer.toString())}
             catch (e) {cb(e)}
           } else {
             var e = new Error('invalid content type.')
             e.statusCode = 400
             cb(e)
+            return
           }
+          cb(null, body)
         })
       }
       
@@ -161,7 +164,6 @@ function Application (opts) {
             self.lru.set(u, cached)
             return
           }
-            
           r.request(req, resp)
         }) 
       } else {
