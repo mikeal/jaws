@@ -177,7 +177,7 @@ function Application (opts) {
     self.emit('request', req, resp)
   }
   self.httpServer = http.createServer(onRequest)
-  self.httpsServer = https.createServer(onRequest)
+  if (opts.ssl) self.httpsServer = https.createServer(opts.ssl, onRequest)
 }
 util.inherits(Application, events.EventEmitter)
 Application.prototype.route = function (pattern, cb) {
