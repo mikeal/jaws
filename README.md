@@ -13,7 +13,7 @@ app.httpServer.listen(80, function () {
 
 #### Routes
 
-Jaws is an API for dealing with HTTP, it is not a framework. Say it with me **"Jaws is a not a framework."**
+Jaws is an API for dealing with HTTP, it is not a framework. Say it with me **"Jaws is not a framework."**
 
 You create a Jaws instance which is what you hang your routes off of.
 
@@ -29,7 +29,7 @@ app.route('/input', function (req, res) {
 
 That would be how you could require that the HTTP methods `PUT` and `POST` were used and if not a proper HTTP error would be returned.
 
-You can also add `conditions` to routes, code that will be executed before the handler and needs to return a true object.
+You can also add `conditions` to routes, code that will be executed before the handler and is required for that route. All conditions fire at once and are not ordered or sequential.
 
 ```javascript
 app.route('/me', function (req, res) {
@@ -68,12 +68,12 @@ app.route('/').file('index.html')
 
 Jaws has the most aggressive caching semantics of any HTTP API I know of. **The full body of every GET request is cached by URL in an LRU cache and held indefinitely.**
 
-The only way to clear something from cache is to flush it by URL.
+The only way to clear something from cache is to flush it by URL or matching route.
 
 ```javascript
 pubsub.on('change', function (id) {
   if (id === 'globals') {
-    // When pubsub tells us the globals changes flush all our pages
+    // When pubsub tells us the globals change flush all our pages
     app.flush('/pages/*')
   }
   // When pubsub tells us an id changes flush the web page for it
