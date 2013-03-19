@@ -28,7 +28,7 @@ app.route('/url', function (req, resp) {
 
 app.route('/invalid', function (req, resp) {
   req.body(function (e, b) {
-    if (!e) throw new Error('should have received error')
+    if (!e) throw new Error('should have received error.')
     resp.statusCode = 200
     resp.end()
   })
