@@ -75,10 +75,10 @@ function Application (opts) {
           var body
           if (mime === 'json') {
             try {body = JSON.parse(buffer.toString())}
-            catch (e) {cb(e)}
+            catch (e) {return cb(e)}
           } else if (mime === 'url') {
             try {body = qs.parse(buffer.toString())}
-            catch (e) {cb(e)}
+            catch (e) {return cb(e)}
           } else {
             var e = new Error('invalid content type.')
             e.statusCode = 400
@@ -284,6 +284,13 @@ Route.prototype.files = function (filepath) {
     if (p.slice(0, filepath.length) !== filepath) {
       resp.statusCode = 403
       return resp.end('Naughty Naughty!')
+    }
+    
+    if (p === filepath) {
+      cached.writeHead(404, {'content-type': 'text/plain'})
+      cached.end('Not Found')
+      console.error('Request to directory with no req.route.extras. You must use /* in your files route.')
+      return
     }
   
     fs.readFile(p, function (e, data) {
