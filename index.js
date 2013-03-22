@@ -307,18 +307,19 @@ Route.prototype.files = function (filepath) {
   }
 }
 Route.prototype.file = function (path, watchFile) {
-  var cached = new Cached()
-  
-  fs.readFile(path, function (e, data) {
-    if (e) {
-      cached.writeHead(404, {'content-type': 'text/plain'})
-      cached.end('Not Found')
-      return
-    }
-    cached.writeHead(200, {'content-type': mime.lookup(path)})
-    cached.end(data)
-  })
   this.request = function (req, resp) {
+    var cached = new Cached()
+  
+    fs.readFile(path, function (e, data) {
+      if (e) {
+        cached.writeHead(404, {'content-type': 'text/plain'})
+        cached.end('Not Found')
+        return
+      }
+      cached.writeHead(200, {'content-type': mime.lookup(path)})
+      cached.end(data)
+    })
+    
     cached.emit('request', req, resp)
     return cached
   }
