@@ -425,6 +425,7 @@ Cached.prototype.write = function (data) {
     if (!this.statusCode) throw new Error('Must set statusCode before write()')
     this.emit('writeHead')
   }
+  if (data.length === 0) return // noop empty data or gzip explodes
   if (!Buffer.isBuffer(data)) data = new Buffer(data)
   this.length += data.length
   this.data.push(data)
