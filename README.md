@@ -64,6 +64,31 @@ app.route('/me', function (req, res) {
 app.route('/').file('index.html')
 ```
 
+And lastly, you can listen to events fired for application level conditions.
+
+```javascript
+app.condition('auth', 401, function (req, resp, cb) {
+  if (!req.headers.cookie) cb(new Error('No cookie header'))
+  getUserByToken(req.headers.cookie, function (e, user) {
+    req.user = user
+    cb(e, user)
+  })
+})
+
+app.route('/user/:userid', function (req, resp) {
+  resp.statusCode = 200
+  resp.end(req.user)
+})
+.condition(401, function (req, resp, cb) {
+  req.on('condition.auth', function (e, user) {
+    if (req.user.id !== req.routes.params.userid) return cb('You can only access your own user document.')
+    cb(null, user)
+  })
+})
+.must('auth')
+;
+```
+
 #### Aggressive Caching
 
 Jaws has the most aggressive caching semantics of any HTTP API I know of. **The full body of every GET request is cached by URL in an LRU cache and held indefinitely.**

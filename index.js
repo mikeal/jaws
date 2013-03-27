@@ -49,6 +49,8 @@ function Application (opts) {
     d.add(resp)
     d.run(function () {
       
+      req._met = {}
+      
       req.body = function (cb) {
         var buffers = []
           , size = 0
@@ -148,6 +150,7 @@ function Application (opts) {
           }
           cb(r)
         }
+
         self.verify(req, resp, next)
         r.verify(req, resp, next)
       }
@@ -223,7 +226,6 @@ function verify (req, resp, next) {
     next()
   }
   var i = 0
-  req._met = {}
     
   for (var name in self.conditions) {
     ;(function (name) {
@@ -231,11 +233,16 @@ function verify (req, resp, next) {
         , statusCode = self.conditions[name][0]
         ;
       handler(req, resp, function (e, o) {
+        
+        process.nextTick(function () {
+          req.emit('condition.'+name, e, o)
+        })
         if (e) {
           req._met[name] = [e, statusCode]
         } else {
           req._met[name] = [null, o]
         }
+
         i += 1
         if (i === l) next()
       })
