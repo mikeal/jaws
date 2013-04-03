@@ -106,17 +106,17 @@ function Application (opts) {
         resp.error(data || 'Not Found', 404)
       }
     
-      resp.html = function (data) {
+      resp.html = function (data, statusCode) {
         resp.setHeader('content-type', 'text/html')
-        resp.statusCode = 200
+        resp.statusCode = statusCode || 200
         resp.end(data)
       }
       
-      resp.json = function (obj) {
+      resp.json = function (obj, statusCode) {
         var body = safeStringify(obj)
         if (!body) return resp.error(new Error('JSON.stringify() failed'))
         resp.setHeader('content-type', 'application/json')
-        resp.statusCode = 200
+        resp.statusCode = statusCode || 200
         resp.end(body)
       }
     

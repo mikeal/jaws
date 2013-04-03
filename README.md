@@ -157,6 +157,6 @@ Jaws sparingly adds some methods to the node's request and response objects for 
 
 * `error(err, [statusCode])` - Return an HTTP error. Accept instances of Error and text and, optionally, a statusCode (defaults to 500).
 * `notfound()` - Return an HTTP 404.
-* `html(body)` - Write the HTML body, set proper headers, and end the response.
-* `json(obj)` - Safely serialize (uses [json-stringify-safe](https://github.com/isaacs/json-stringify-safe)) the object to JSON, set proper headers, end the request.
+* `html(body, [statusCode])` - Write the HTML body, set proper headers, and end the response.
+* `json(obj, [statusCode])` - Safely serialize (uses [json-stringify-safe](https://github.com/isaacs/json-stringify-safe)) the object to JSON, set proper headers, end the request.
 
