@@ -10,7 +10,7 @@ var fs = require('fs')
   , domain = require('domain')
   , urlparse = require('url').parse
   , qs = require('querystring')
-  
+
   , mime = require('mime')
   , mapleTree = require('mapleTree')
   , lrucache = require('lru-cache')
@@ -26,31 +26,31 @@ function getMime (contenttype) {
 function Application (opts) {
   var self = this
   opts.max = opts.max || 1000
-  
+
   self.lru = lrucache(opts)
   self.routes = new mapleTree.RouteTree()
   self.conditions = {}
   self.globalHeaders = {}
-  
+
   self.on('request', function (req, resp) {
     var d = domain.create()
     d.on('error', function (e) {
       console.error(e.stack)
-      
+
       resp.statusCode = 500
       if (!resp._headerSent) {
         resp.setHeader('content-type', 'text-plain')
         resp.write(e.stack)
-      }      
+      }
       try { resp.end() }
       catch(e) {}
     })
     d.add(req)
     d.add(resp)
     d.run(function () {
-      
+
       req._met = {}
-      
+
       req.body = function (cb) {
         var buffers = []
           , size = 0
@@ -61,7 +61,7 @@ function Application (opts) {
           e.statusCode = 400
           return cb(e)
         }
-        
+
         req.on('data', function (chunk) {
           buffers.push(chunk)
           size += chunk.length
@@ -90,7 +90,7 @@ function Application (opts) {
           cb(null, body)
         })
       }
-      
+
       resp.error = function (err, statusCode) {
         resp.statusCode = statusCode || err.statusCode || 500
         resp.setHeader('content-type', 'text/plain')
@@ -101,17 +101,17 @@ function Application (opts) {
           else resp.end('error')
         }
       }
-      
+
       resp.notfound = function (data) {
         resp.error(data || 'Not Found', 404)
       }
-    
+
       resp.html = function (data, statusCode) {
         resp.setHeader('content-type', 'text/html')
         resp.statusCode = statusCode || 200
         resp.end(data)
       }
-      
+
       resp.json = function (obj, statusCode) {
         var body = safeStringify(obj)
         if (!body) return resp.error(new Error('JSON.stringify() failed'))
@@ -119,13 +119,13 @@ function Application (opts) {
         resp.statusCode = statusCode || 200
         resp.end(body)
       }
-    
+
       for (var i in self.globalHeaders) {
         resp.setHeader(i, self.globalHeaders[i])
       }
-        
+
       var u = urlparse('http://localhost' + req.url).pathname
-        
+
       function getRoute (cb) {
         req.route = self.routes.match(u)
         if (!req.route || !req.route.fn) {
@@ -133,9 +133,9 @@ function Application (opts) {
           return
         }
         var r = req.route.fn()
-          
+
         if (r._methods && r._methods.indexOf(req.method) === -1) return resp.error('Method not allowed.', 405)
-                    
+
         // condition() handling
         var done = 0
         function next () {
@@ -154,11 +154,11 @@ function Application (opts) {
         self.verify(req, resp, next)
         r.verify(req, resp, next)
       }
-        
+
       if (req.method === 'GET' || req.method === 'HEAD') {
-          
+
         var cached = self.lru.get(req.url)
-          
+
         getRoute(function (r) {
           if (cached) return cached.emit('request', req, resp)
 
@@ -168,16 +168,16 @@ function Application (opts) {
             return
           }
           r.request(req, resp)
-        }) 
+        })
       } else {
         getRoute(function (r) {
           r.request(req, resp)
-        }) 
+        })
       }
 
     })
   })
-  
+
   function onRequest (req, resp) {
     self.emit('request', req, resp)
   }
@@ -212,9 +212,17 @@ function condition (name, statusCode, handler) {
     handler = statusCode
     statusCode = 500
   }
-  
+
   this.conditions[name] = [statusCode, handler]
   return name
+}
+
+Application.prototype.engineio = function (cb) {
+  if (this._engineio) {
+    if (cb) this._engineio.on('connection', cb)
+    return this._engineio
+  }
+  this._engineio = engine
 }
 
 Application.prototype.verify = verify
@@ -226,14 +234,14 @@ function verify (req, resp, next) {
     next()
   }
   var i = 0
-    
+
   for (var name in self.conditions) {
     ;(function (name) {
       var handler = self.conditions[name][1]
         , statusCode = self.conditions[name][0]
         ;
       handler(req, resp, function (e, o) {
-        
+
         process.nextTick(function () {
           req.emit('condition.'+name, e, o)
         })
@@ -260,14 +268,14 @@ function Route (app, pattern, cb) {
     self.request = function (req, resp) {
       if (self._cachable && (req.method === 'GET' || req.method === 'HEAD' )) {
         var cached = new Cached()
-      
+
         resp._write = resp.write
         resp.write = function write (chunk) {
           if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
           cached.write(chunk)
           resp._write(chunk)
         }
-      
+
         resp._end = resp.end
         resp.end = function end (chunk) {
           if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
@@ -275,7 +283,7 @@ function Route (app, pattern, cb) {
           resp._end(chunk)
         }
       }
-      
+
       cb(req, resp)
       return cached
     }
@@ -285,21 +293,21 @@ util.inherits(Route, events.EventEmitter)
 Route.prototype.files = function (filepath) {
   this.request = function (req, resp) {
     var cached = new Cached()
-    
+
     req.route.extras.unshift(filepath)
     var p = path.join.apply(path.join, req.route.extras)
     if (p.slice(0, filepath.length) !== filepath) {
       resp.statusCode = 403
       return resp.end('Naughty Naughty!')
     }
-    
+
     if (p === filepath) {
       cached.writeHead(404, {'content-type': 'text/plain'})
       cached.end('Not Found')
       console.error('Request to directory with no req.route.extras. You must use /* in your files route.')
       return
     }
-  
+
     fs.readFile(p, function (e, data) {
       if (e) {
         cached.writeHead(404, {'content-type': 'text/plain'})
@@ -316,7 +324,7 @@ Route.prototype.files = function (filepath) {
 Route.prototype.file = function (path, watchFile) {
   this.request = function (req, resp) {
     var cached = new Cached()
-  
+
     fs.readFile(path, function (e, data) {
       if (e) {
         cached.writeHead(404, {'content-type': 'text/plain'})
@@ -326,7 +334,7 @@ Route.prototype.file = function (path, watchFile) {
       cached.writeHead(200, {'content-type': mime.lookup(path)})
       cached.end(data)
     })
-    
+
     cached.emit('request', req, resp)
     return cached
   }
@@ -361,7 +369,7 @@ function Cached () {
   self.methods = ['GET', 'HEAD']
   self.on('request', function (req, resp) {
     self.urls[req.url] = true
-    
+
     if (req.method === 'HEAD' && self.md5) {
       resp.writeHead(self.statusCode, self.headers)
       resp.end()
@@ -376,7 +384,7 @@ function Cached () {
       resp.end()
       return
     }
-    
+
     // gzipping
     if (self.ended && req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/) ) {
       for (var i in self.headers) {
@@ -387,7 +395,7 @@ function Cached () {
       resp.end(self.compressed)
       return
     }
-    
+
     if (self.ended) {
       resp.writeHead(self.statusCode, self.headers)
       return resp.end(self.buffer)
@@ -458,9 +466,9 @@ Cached.prototype.removeHeader = function (key) {
 Cached.prototype.end = function (data) {
   if (data) this.write(data)
   this.ended = true
-  
+
   this.compressor.end()
-  
+
   var i = 0
   var buffer = new Buffer(this.length)
   this.data.forEach(function (chunk) {
