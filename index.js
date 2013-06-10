@@ -23,7 +23,7 @@ function getMime (contenttype) {
   return null
 }
 
-function Application (opts) {
+function Application (opts, decorator) {
   var self = this
   opts.max = opts.max || 1000
 
@@ -179,6 +179,8 @@ function Application (opts) {
   })
 
   function onRequest (req, resp) {
+    if(typeof decorator === 'function') decorator(req, resp)
+    
     self.emit('request', req, resp)
   }
   self.httpServer = http.createServer(onRequest)
@@ -483,4 +485,4 @@ Cached.prototype.end = function (data) {
   this.emit('end')
 }
 
-module.exports = function (opts) {return new Application(opts || {})}
+module.exports = function (opts, decorator) {return new Application(opts || {}, decorator)}
