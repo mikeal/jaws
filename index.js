@@ -179,9 +179,12 @@ function Application (opts, decorator) {
   })
 
   function onRequest (req, resp) {
-    if(typeof decorator === 'function') decorator(req, resp)
-    
-    self.emit('request', req, resp)
+    if(typeof decorator === 'function'){
+      decorator(req, resp, function(req, res){
+        self.emit('request', req, resp)
+      })
+    }
+    else self.emit('request', req, resp)
   }
   self.httpServer = http.createServer(onRequest)
   if (opts.ssl) self.httpsServer = https.createServer(opts.ssl, onRequest)
