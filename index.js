@@ -27,6 +27,7 @@ function Application (opts, decorator) {
   var self = this
   opts.max = opts.max || 1000
 
+  self.cachable = opts.cachable || true
   self.lru = lrucache(opts)
   self.routes = new mapleTree.RouteTree()
   self.conditions = {}
@@ -267,7 +268,7 @@ function Route (app, pattern, cb) {
   var self = this
   self.app = app
   self.pattern = pattern
-  self._cachable = true
+  self._cachable = self.cachable
   self.conditions = {}
   if (cb) {
     self.request = function (req, resp) {
