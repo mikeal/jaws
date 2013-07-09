@@ -370,70 +370,60 @@ function Cached () {
   self.on('request', function (req, resp) {
     self.urls[req.url] = true
 
-    if (req.method === 'HEAD' && self.md5) {
-      resp.writeHead(self.statusCode, self.headers)
-      resp.end()
-      return
-    }
-    if (req.headers['if-none-match'] && req.headers['if-none-match'] === self.md5) {
-      var h = {}
-      for (var i in self.headers) {
-        if (i !== 'content-length') h[i] = self.headers[i]
+    function _do () {
+      if (req.method === 'HEAD' && self.md5) {
+        resp.writeHead(self.statusCode, self.headers)
+        resp.end()
+        return
       }
-      resp.writeHead(304, h)
-      resp.end()
-      return
-    }
+      if (req.headers['if-none-match'] && req.headers['if-none-match'] === self.md5) {
+        var h = {}
+        for (var i in self.headers) {
+          if (i !== 'content-length') h[i] = self.headers[i]
+        }
+        resp.writeHead(304, h)
+        resp.end()
+        return
+      }
 
-    // gzipping
-    if (self.compressed && req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/) ) {
-      for (var i in self.headers) {
-        resp.setHeader(i, self.headers[i])
+      // gzipping
+      if (self.compressed && req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/) ) {
+        for (var i in self.headers) {
+          resp.setHeader(i, self.headers[i])
+        }
+        resp.setHeader('content-encoding', 'gzip')
+        resp.setHeader('content-length', self.compressed.length)
+        resp.end(self.compressed)
+        return
       }
-      resp.setHeader('content-encoding', 'gzip')
-      resp.setHeader('content-length', self.compressed.length)
-      resp.end(self.compressed)
-      return
+
+      resp.writeHead(self.statusCode, self.headers)
+      return resp.end(self.buffer)
     }
 
     if (self.ended) {
-      resp.writeHead(self.statusCode, self.headers)
-      return resp.end(self.buffer)
+      _do()
     } else {
-      if (self.statusCode) {
-        resp.writeHead(self.statusCode, self.headers)
-        self.data.forEach(function (chunk) {
-          resp.write(chunk)
-        })
-      } else {
-        self.once('writeHead', function () {
-          resp.writeHead(self.statusCode, self.headers)
-        })
-      }
-      self.on('data', function (chunk) {
-        resp.write(chunk)
-      })
-      self.on('end', function () {
-        resp.end()
-      })
+      self.on('end', _do)
     }
+
   })
-  self.compressor = new zlib.createGzip()
-  self.compressedData = []
-  self.compressedLength = 0
-  self.compressor.on('data', function (chunk) {
-    self.compressedData.push(chunk)
-    self.compressedLength += chunk.length
-  })
-  self.compressor.on('end', function () {
-    var i = 0
-    var buffer = new Buffer(self.compressedLength)
-    self.compressedData.forEach(function (chunk) {
-      chunk.copy(buffer, i, 0, chunk.length)
-      i += chunk.length
-    })
-    self.compressed = buffer
-  })
+  // self.compressor = new zlib.createGzip()
+  // self.compressedData = []
+  // self.compressedLength = 0
+  // self.compressor.on('data', function (chunk) {
+  //   self.compressedData.push(chunk)
+  //   self.compressedLength += chunk.length
+  // })
+  // self.compressor.on('end', function () {
+  //   var i = 0
+  //   var buffer = new Buffer(self.compressedLength)
+  //   self.compressedData.forEach(function (chunk) {
+  //     chunk.copy(buffer, i, 0, chunk.length)
+  //     i += chunk.length
+  //   })
+  //   self.compressed = buffer
+  // })
 }
 util.inherits(Cached, events.EventEmitter)
 Cached.prototype.write = function (data) {
@@ -445,8 +435,7 @@ Cached.prototype.write = function (data) {
   if (!Buffer.isBuffer(data)) data = new Buffer(data)
   this.length += data.length
   this.data.push(data)
-  this.compressor.write(data)
-  this.emit('data', data)
+  // this.compressor.write(data)
 }
 Cached.prototype.writeHead = function (status, headers) {
   this._headerSent = true
@@ -465,22 +454,23 @@ Cached.prototype.removeHeader = function (key) {
 }
 Cached.prototype.end = function (data) {
   if (data) this.write(data)
-  this.ended = true
 
-  this.compressor.end()
-
-  var i = 0
-  var buffer = new Buffer(this.length)
-  this.data.forEach(function (chunk) {
-    chunk.copy(buffer, i, 0, chunk.length)
-    i += chunk.length
-  })
-  this.headers['content-length'] = this.length
+  // this.compressor.end()
+  var self = this
+  var buffer = Buffer.concat(this.data)
+  this.headers['content-length'] = buffer.length
   delete this.data
   this.buffer = buffer
   this.md5 = crypto.createHash('md5').update(this.buffer).digest("hex")
   this.headers['etag'] = this.md5
-  this.emit('end')
+
+  zlib.gzip(buffer, function (e, compressed) {
+    if (e) return self.emit('error', e)
+    self.compressed = compressed
+    self.ended = true
+    self.emit('end')
+  })
+
 }
 
 module.exports = function (opts) {return new Application(opts || {})}
