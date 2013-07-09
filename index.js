@@ -408,22 +408,6 @@ function Cached () {
     }
 
   })
-  // self.compressor = new zlib.createGzip()
-  // self.compressedData = []
-  // self.compressedLength = 0
-  // self.compressor.on('data', function (chunk) {
-  //   self.compressedData.push(chunk)
-  //   self.compressedLength += chunk.length
-  // })
-  // self.compressor.on('end', function () {
-  //   var i = 0
-  //   var buffer = new Buffer(self.compressedLength)
-  //   self.compressedData.forEach(function (chunk) {
-  //     chunk.copy(buffer, i, 0, chunk.length)
-  //     i += chunk.length
-  //   })
-  //   self.compressed = buffer
-  // })
 }
 util.inherits(Cached, events.EventEmitter)
 Cached.prototype.write = function (data) {
@@ -435,7 +419,6 @@ Cached.prototype.write = function (data) {
   if (!Buffer.isBuffer(data)) data = new Buffer(data)
   this.length += data.length
   this.data.push(data)
-  // this.compressor.write(data)
 }
 Cached.prototype.writeHead = function (status, headers) {
   this._headerSent = true
@@ -455,7 +438,6 @@ Cached.prototype.removeHeader = function (key) {
 Cached.prototype.end = function (data) {
   if (data) this.write(data)
 
-  // this.compressor.end()
   var self = this
   var buffer = Buffer.concat(this.data)
   this.headers['content-length'] = buffer.length
