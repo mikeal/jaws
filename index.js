@@ -404,7 +404,7 @@ function Cached () {
     if (self.ended) {
       _do()
     } else {
-      self.on('end', _do)
+      self.once('end', _do)
     }
 
   })
