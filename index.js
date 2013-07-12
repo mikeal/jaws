@@ -273,15 +273,16 @@ function Route (app, pattern, cb) {
         resp.write = function write (chunk) {
           if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
           cached.write(chunk)
-          resp._write(chunk)
         }
 
         resp._end = resp.end
         resp.end = function end (chunk) {
+          resp.end = resp._end
+          resp.write = resp._write
           if (!cached.statusCode) cached.writeHead(resp.statusCode, resp._headers)
           cached.end(chunk)
-          resp._end(chunk)
         }
+        cached.emit('request', req, resp)
       }
 
       cb(req, resp)
@@ -398,7 +399,7 @@ function Cached () {
       }
 
       resp.writeHead(self.statusCode, self.headers)
-      return resp.end(self.buffer)
+      resp.end(self.buffer)
     }
 
     if (self.ended) {
@@ -437,7 +438,6 @@ Cached.prototype.removeHeader = function (key) {
 }
 Cached.prototype.end = function (data) {
   if (data) this.write(data)
-
   var self = this
   var buffer = Buffer.concat(this.data)
   this.headers['content-length'] = buffer.length
