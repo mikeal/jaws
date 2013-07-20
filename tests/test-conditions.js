@@ -28,7 +28,7 @@ app.route('/no', function (req, resp) {
   resp.statusCode = 200
   resp.end('ok')
 })
-.condition(function (req, resp, cb) {
+.condition(403, function (req, resp, cb) {
   cb(new Error('no options'))
 })
 
@@ -69,7 +69,7 @@ app.httpServer.listen(8080, function () {
   
   var r = request.post('http://localhost:8080/no', function (e, resp, body) {
     if (e) throw e
-    assert.equal(500, resp.statusCode)
+    assert.equal(403, resp.statusCode)
     assert.notEqual('ok', body)
     done()
   })

@@ -204,13 +204,16 @@ Application.prototype.addHeader = function (name, value) {
 Application.prototype.condition = condition
 
 function condition (name, statusCode, handler) {
+  var unnamed = 'unnamed-'+Math.floor(Math.random()*111111111)
+
   if (!statusCode) {
     handler = name
     statusCode = 500
-    name = 'unnamed-'+Math.floor(Math.random()*111111111)
+    name = unnamed
   } else if (!handler) {
     handler = statusCode
-    statusCode = 500
+    statusCode = typeof name === 'string' ? 500 : name
+    name = typeof name === 'string' ? name : unnamed
   }
 
   this.conditions[name] = [statusCode, handler]
