@@ -164,7 +164,8 @@ function Application (opts) {
 
           if (r._cachable) {
             cached = r.request(req, resp)
-            self.lru.set(u, cached)
+            if (resp.statusCode === 200)
+              self.lru.set(u, cached)
             return
           }
           r.request(req, resp)
