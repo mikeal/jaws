@@ -6,7 +6,9 @@ var jaws = require('../index')
 var app = jaws()
 
 app.route('/error', function (req, resp) {
-  resp.error(new Error('Something bad'))
+  process.nextTick(function () {
+    resp.error(new Error('Something bad'))
+  })
 })
 ;
 
