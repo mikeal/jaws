@@ -3,7 +3,7 @@ var jaws = require('../index')
   , request = require('request')
   ;
 
-var app = jaws({cacheErrors: false})
+var app = jaws()
 
 app.route('/error', function (req, resp) {
   process.nextTick(function () {
