@@ -31,6 +31,7 @@ function Application (opts) {
   self.routes = new mapleTree.RouteTree()
   self.conditions = {}
   self.globalHeaders = {}
+  self.cacheErrors = opts.cacheErrors
 
   self.on('request', function (req, resp) {
     var d = domain.create()
@@ -165,6 +166,13 @@ function Application (opts) {
           if (r._cachable) {
             cached = r.request(req, resp)
             self.lru.set(u, cached)
+
+            if (!self.cacheErrors)
+              resp.once('finish', function () {
+                if (resp.statusCode !== 200)
+                  self.lru.del(u)
+              })
+
             return
           }
           r.request(req, resp)
