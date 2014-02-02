@@ -15,7 +15,8 @@
     "mime": "~1.2.9",
     "mapleTree": "~0.5.0-1",
     "lru-cache": "~2.2.2",
-    "json-stringify-safe": "~3.0.0"
+    "json-stringify-safe": "~3.0.0",
+    "compressible": "~1.0.0"
   },
   "devDependencies": {
     "request": "~2.10.0"
