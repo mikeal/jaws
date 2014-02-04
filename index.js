@@ -23,10 +23,11 @@ function getMime (contenttype) {
   return null
 }
 
-function Application (opts) {
+function Application (opts, decorator) {
   var self = this
   opts.max = opts.max || 1000
 
+  self.cachable = opts.cachable || true
   self.lru = lrucache(opts)
   self.routes = new mapleTree.RouteTree()
   self.conditions = {}
@@ -187,7 +188,12 @@ function Application (opts) {
   })
 
   function onRequest (req, resp) {
-    self.emit('request', req, resp)
+    if(typeof decorator === 'function'){
+      decorator(req, resp, function(req, res){
+        self.emit('request', req, resp)
+      })
+    }
+    else self.emit('request', req, resp)
   }
   self.httpServer = http.createServer(onRequest)
   if (opts.ssl) self.httpsServer = https.createServer(opts.ssl, onRequest)
@@ -273,7 +279,7 @@ function Route (app, pattern, cb) {
   var self = this
   self.app = app
   self.pattern = pattern
-  self._cachable = true
+  self._cachable = self.cachable
   self.conditions = {}
   if (cb) {
     self.request = function (req, resp) {
@@ -466,4 +472,4 @@ Cached.prototype.end = function (data) {
 
 }
 
-module.exports = function (opts) {return new Application(opts || {})}
+module.exports = function (opts, decorator) {return new Application(opts || {}, decorator)}
