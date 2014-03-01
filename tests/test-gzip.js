@@ -9,8 +9,10 @@ var jaws = require('../index')
 var app = jaws()
 
 app.route('/test').file(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'treeRouter.js'))
+app.route('/test-png').file(path.join(__dirname, '..', 'node_modules', 'request', 'tests', 'googledoodle.png'))
 
 var buff = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'mapleTree', 'treeRouter.js'))
+var buffPng = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'request', 'tests', 'googledoodle.png'))
 
 app.httpServer.listen(8080, function () {
   request.get('http://localhost:8080/test', function (e, resp, body) {
@@ -41,7 +43,28 @@ app.httpServer.listen(8080, function () {
         if (e) throw e
         assert.deepEqual(data, buff)
       })
-      app.httpServer.close()
+
+      var r = request.get('http://localhost:8080/test-png', {headers:{'accept-encoding': 'gzip, deflate'}})
+
+      r.on('response', function (resp) {
+        if (resp.statusCode !== 200) throw new Error('status code is not 200.'+resp.statusCode)
+
+        assert.equal(resp.headers['content-type'], 'image/png')
+        assert.equal(resp.headers['content-encoding'], undefined)
+
+        app.httpServer.close()
+      })
+
+      var chunksPng = []
+      r.on('data', function (chunk) {
+        chunksPng.push(chunk)
+      })
+
+      r.on('end', function () {
+        var buffer = Buffer.concat(chunksPng)
+        assert.deepEqual(buffer, buffPng)
+      })
+
     })
     r.on('error', function (e) {throw e})
   })
