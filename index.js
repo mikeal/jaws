@@ -399,7 +399,7 @@ function Cached () {
       }
 
       // gzipping
-      if (self.compressed && req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/) ) {
+      if (self.compressed && req.headers['accept-encoding'] && req.headers['accept-encoding'].indexOf('gzip') > -1 ) {
         for (var i in self.headers) {
           resp.setHeader(i, self.headers[i])
         }
