@@ -110,9 +110,9 @@ You can also flush the entire cache quite easily.
 
 ```javascript
 // Regularly flush the whole cache
-setInterval(1000 * 60 * 60, function () {
+setInterval(function () {
   app.flush()
-})
+}, 1000 * 60 * 60)
 ```
 
 For obvious reasons HTTP methods other than `HEAD` and `GET` are not cached. You can also avoid the caching of a route by using `nocache()`.
