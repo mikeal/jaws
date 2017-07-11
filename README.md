@@ -1,5 +1,7 @@
 # Jaws (this is not a framework)
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/mikeal/jaws.svg)](https://greenkeeper.io/)
+
 ```javascript
 var jaws = require("jaws")
 var app = jaws()
