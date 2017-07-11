@@ -12,13 +12,13 @@
     "url": "git://github.com/mikeal/jaws.git"
   },
   "dependencies": {
-    "mime": "~1.2.9",
+    "mime": "~1.3.6",
     "mapleTree": "~0.5.0-1",
-    "lru-cache": "~2.2.2",
-    "json-stringify-safe": "~3.0.0"
+    "lru-cache": "~4.1.1",
+    "json-stringify-safe": "~5.0.1"
   },
   "devDependencies": {
-    "request": "~2.10.0"
+    "request": "~2.81.0"
   },
   "optionalDependencies": {},
   "engines": {
